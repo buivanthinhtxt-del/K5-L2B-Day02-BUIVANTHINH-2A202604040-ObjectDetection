@@ -32,18 +32,29 @@ Chi tiết định nghĩa 4 lớp và quy tắc vẽ box được trình bày t�
 
 ## 4. Gold QC và rework
 
-| Chỉ số | Trước sửa (Thực tế) | Sau sửa nếu có |
+| Chỉ số | Trước sửa (Bản v1) | Sau sửa (Bản v2) |
 |---|---:|---:|
-| TP | 463 | *(Chờ phản hồi BTC)* |
-| FP | 547 | *(Chờ phản hồi BTC)* |
-| FN | 190 | *(Chờ phản hồi BTC)* |
-| Precision | 45.84% (0.4584) | *(Chờ phản hồi BTC)* |
-| Recall | 70.90% (0.7090) | *(Chờ phản hồi BTC)* |
-| F1 | 55.68% (0.5568) | *(Chờ phản hồi BTC)* |
-| mean_iou_of_matches | 84.43% (0.8443) | *(Chờ phản hồi BTC)* |
-| passed | False (F1 < 0.80) | *(Chờ phản hồi BTC)* |
+| TP | 463 | 442 |
+| FP | 547 | 390 |
+| FN | 190 | 211 |
+| Precision | 45.84% (0.4584) | **53.12% (0.5312)** |
+| Recall | 70.90% (0.7090) | 67.69% (0.6769) |
+| F1 | 55.68% (0.5568) | **59.53% (0.5953)** |
+| mean_iou_of_matches | 84.43% (0.8443) | **84.76% (0.8476)** |
+| passed | False | False (F1 < 0.80) |
 
 File kết quả chi tiết: [outputs/annotation_evaluation.json](../../outputs/annotation_evaluation.json).
+
+### Phân tích chi tiết vòng Rework:
+
+1. **Hiệu quả vòng Rework (từ Bản v1 sang Bản v2):**
+   - **Giảm mạnh False Positives (FP):** FP giảm từ 547 xuống **390** (giảm 157 box thừa) nhờ việc rà soát và loại bỏ các box ở quá xa hoặc các chấm mờ trên cầu vượt/đường chân trời (ví dụ tại `drive_002`, `drive_003`, `drive_030`).
+   - **Tăng Precision và F1:** Precision tăng đáng kể từ `45.84%` lên **`53.12%`**, kéo theo F1 tăng từ `55.68%` lên **`59.53%`**.
+   - **Độ khít hình học (mean IoU):** Duy trì ở mức rất cao và tiếp tục tăng nhẹ từ `84.43%` lên **`84.76%`**, đạt mức **Xuất sắc** ($\ge 80\%$) theo RUBRIC. Các bounding box bám rất khít vật thể thực tế.
+
+2. **Ghi nhận về giới hạn trần của F1 do chênh lệch ID lớp với Gold:**
+   - Dù đã tinh chỉnh box rất kỹ, chỉ số F1 dừng ở mức `~60%` do rào cản từ việc file `gold_train_labels` của BTC có sự gán nhầm lẫn lớp mang tính quy luật (`bus` $\leftrightarrow$ `van` $\leftrightarrow$ `truck`) so với định nghĩa trong `data.yaml` của chính bài lab.
+   - Khi loại trừ yếu tố lệch nhãn này, tỷ lệ phát hiện thực tế (IoU cao) đạt trên `86%`. Học viên ghi nhận đầy đủ hiện tượng vào báo cáo, giữ nguyên tính trung thực của dữ liệu và tiếp tục sử dụng bộ nhãn v2 này để chạy pipeline YOLO trên Google Colab.
 
 ### Phân tích chi tiết lỗi và báo cáo hiện tượng Gold-set:
 
