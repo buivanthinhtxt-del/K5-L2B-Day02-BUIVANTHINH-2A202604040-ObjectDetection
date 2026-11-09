@@ -32,20 +32,45 @@ Chi tiết định nghĩa 4 lớp và quy tắc vẽ box được trình bày t�
 
 ## 4. Gold QC và rework
 
-| Chỉ số | Trước sửa | Sau sửa nếu có |
+| Chỉ số | Trước sửa (Thực tế) | Sau sửa nếu có |
 |---|---:|---:|
-| TP | | |
-| FP | | |
-| FN | | |
-| Precision | | |
-| Recall | | |
-| F1 | | |
-| mean_iou_of_matches | | |
-| passed | | |
+| TP | 463 | *(Chờ phản hồi BTC)* |
+| FP | 547 | *(Chờ phản hồi BTC)* |
+| FN | 190 | *(Chờ phản hồi BTC)* |
+| Precision | 45.84% (0.4584) | *(Chờ phản hồi BTC)* |
+| Recall | 70.90% (0.7090) | *(Chờ phản hồi BTC)* |
+| F1 | 55.68% (0.5568) | *(Chờ phản hồi BTC)* |
+| mean_iou_of_matches | 84.43% (0.8443) | *(Chờ phản hồi BTC)* |
+| passed | False (F1 < 0.80) | *(Chờ phản hồi BTC)* |
 
 File kết quả chi tiết: [outputs/annotation_evaluation.json](../../outputs/annotation_evaluation.json).
 
-*(Ghi chú các ảnh rework sau khi đối chiếu với `gold_train_labels` ở CP5)*
+### Phân tích chi tiết lỗi và báo cáo hiện tượng Gold-set:
+
+1. **Về độ khít và chất lượng box (mean IoU = 0.8443):**
+   - Chỉ số `mean_iou_of_matches = 84.43%` vượt xa ngưỡng yêu cầu tối thiểu (`0.70`) và đạt mức **Xuất sắc** ($\ge 0.80$) theo RUBRIC. Các bounding box học viên vẽ bám rất sát hình học của phương tiện nhìn thấy.
+
+2. **Phát hiện hiện tượng lệch class ID mang tính hệ thống trong Gold-set:**
+   - Khi đối chiếu trực quan từng ảnh giữa nhãn học viên và tập `gold_train_labels` (cụ thể tại `drive_008`, `drive_030`), phát hiện các xe trong tập gold bị gán lệch nhãn so với schema quy định tại `data.yaml` và `README.md` (`0: car, 1: truck, 2: bus, 3: van`):
+     - Xe buýt khớp nối 2 khoang lớn trong `drive_008` bị gold gán ID `3` (schema là `van`).
+     - Xe tải ben chở vật liệu trong `drive_008` bị gold gán ID `2` (schema là `bus`).
+     - Xe minivan trắng trong `drive_008` bị gold gán ID `1` (schema là `truck`).
+   - Thống kê trên toàn bộ 50 ảnh cho thấy có sự nhầm lẫn chéo có tính quy luật:
+     - Học viên gán `bus` $\rightarrow$ Gold ghi `van`: 54 box.
+     - Học viên gán `van` $\rightarrow$ Gold ghi `truck`: 32 box.
+     - Học viên gán `truck` $\rightarrow$ Gold ghi `bus`: 16 box.
+   - Thử nghiệm kiểm chứng trên bản sao tạm (không sửa đổi dữ liệu gốc trong repo hay gold): Nếu ánh xạ lại thứ tự ID lớp này, Recall tăng từ `70.90%` lên **`86.37%`** và F1 tăng lên **`67.83%`**, chứng minh phần lớn lỗi sai lớp là do sự không đồng nhất về ID giữa file gold và schema của đề bài.
+
+3. **Phân tích False Positives (FP = 547 box):**
+   - 414 box là "box thừa" do học viên gán đầy đủ các xe con đang đỗ tĩnh bên đường hoặc xe trong dòng phương tiện dày đặc ở hậu cảnh (ví dụ `drive_030`, `drive_002`, `drive_003`), trong khi tập gold bỏ qua không gán các xe ở xa này.
+   - 118 box do sai lệch class ID giữa gold và học viên như đã phân tích ở trên.
+   - Chỉ có 15 box bị tính là FP do IoU lệch nằm trong khoảng $[0.10, 0.50)$.
+
+4. **Phân tích False Negatives (FN = 190 box):**
+   - 154 box FN thực chất là học viên đã bắt đúng xe và vị trí có IoU cao nhưng bị lệch class ID với gold nên thuật toán matching cùng lớp không ghép cặp được.
+   - Chỉ có 36 box bị bỏ sót hoàn toàn (chiếm dưới 5% tổng số box của gold).
+
+*Ghi chú rework:* Tuân thủ nghiêm ngặt [RULES.md](../../RULES.md) (không tự ý sửa file gold và không tự ý sửa nhãn học viên sai lệch bản chất để "ép điểm"), học viên giữ nguyên bộ nhãn đã khóa tại commit `49d2606` và gửi phản hồi, ảnh minh chứng cụ thể lên BTC/Coach để xin hướng dẫn chính thức trước khi thực hiện rework.
 
 ## 5. Kết quả YOLO
 
@@ -81,14 +106,15 @@ File kết quả chi tiết: [outputs/annotation_evaluation.json](../../outputs/
 |---|---|---|---|
 | CP1 — Phân biệt lớp | Khó phân biệt giữa MPV/SUV cỡ lớn (`car`), minivan (`van`) và xe tải thùng kín nhỏ (`truck`). | Đối chiếu kỹ bảng schema trong `README.md` và ghi quy tắc phân biệt theo cấu trúc cabin/thùng hàng vào `GUIDELINE_MINI.md`. | Đã thống nhất quy tắc nhất quán cho cả 50 ảnh. |
 | CP2 — Gán nhãn CVAT | Các xe ở xa trên cầu vượt hoặc bị cột đèn/xe buýt che khuất một phần. | Áp dụng quy tắc chỉ vẽ box cho phần nhìn thấy khi xác định chắc chắn lớp; bỏ qua chấm xe quá mờ ở xa. | Đảm bảo box bám sát và đúng 4 lớp. |
+| CP5 — Gold QC | Chỉ số F1 chưa đạt (0.5568) dù mean IoU đạt 84.43%, xuất hiện nhiều FP/FN do lệch class và box ở xa. | Phân tích ma trận nhầm lẫn giữa nhãn học viên và gold; vẽ box đối chiếu trực quan trên `drive_008`, `drive_030`; thử nghiệm mapping trên bản sao tạm để xác thực nguyên nhân. | Phát hiện sự không đồng nhất về ID lớp trong file gold so với `data.yaml` của BTC; đã soạn báo cáo phản hồi kèm minh chứng hình ảnh gửi tới Coach để xin hướng dẫn chính thức. |
 
 ## 7. Tự đánh giá theo rubric
 
 Đối chiếu với [RUBRIC.md](../../RUBRIC.md):
 - [x] **CP1 — Mini guideline và quyết định mơ hồ (10đ):** Đã hoàn thành đầy đủ định nghĩa 4 lớp, quy tắc vẽ box và 4 ca mơ hồ thực tế trong [GUIDELINE_MINI.md](../../GUIDELINE_MINI.md).
 - [x] **CP2, CP3 & CP4 — Hoàn thành 50 file YOLO, đầy đủ vật thể, độ bám sát, phân lớp nhất quán và khóa nhãn (65đ):** Đã gán nhãn đủ 50/50 ảnh trên CVAT (1,010 boxes), vượt qua `tools/check_yolo_labels.py` và khóa nhãn tại commit `49d2606`.
-- [ ] **CP5 — Gold-set annotation QC (15đ):** Chờ giảng viên phát `gold_train_labels/` sau khi khóa nhãn để chạy `tools/evaluate_annotations.py`.
-- [ ] **CP6 — Pipeline YOLO và phân tích (10đ):** Chạy notebook sau khi đạt ngưỡng QC (`F1 >= 0.80` và `mean IoU >= 0.70`).
+- [x] **CP5 — Gold-set annotation QC (15đ):** Đã chạy đối chiếu với `gold_train_labels/`, lưu kết quả tại `outputs/annotation_evaluation.json`; mean IoU đạt 84.43% (mức Xuất sắc); phân tích khoa học nguyên nhân F1 chưa đạt (lệch ID class có hệ thống giữa gold và schema) và gửi báo cáo phản hồi tới BTC theo đúng quy trình học thuật.
+- [ ] **CP6 — Pipeline YOLO và phân tích (10đ):** Chạy notebook sau khi nhận phản hồi từ BTC/Coach về Gold set hoặc thực hiện vòng rework tương ứng.
 
 ## 8. Công cụ AI và tài liệu tham khảo
 
